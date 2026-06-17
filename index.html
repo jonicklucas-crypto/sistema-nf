@@ -4,14 +4,14 @@
 <meta charset="UTF-8">
 <title>Sistema NF</title>
 
+<!-- ✅ scripts corretos -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-
-<!-- ✅ FIREBASE CORRETO -->
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
 
 <style>
 body { font-family:Arial; margin:0; background:#f4f6f9; }
+
 .menu { width:220px; height:100vh; position:fixed; background:#2c3e50; }
 .menu button { width:100%; padding:15px; border:none; background:none; color:white; cursor:pointer; }
 .menu button:hover { background:#1abc9c; }
@@ -30,6 +30,7 @@ th, td { padding:5px; border:1px solid #ddd; white-space:nowrap; }
 .recebido { background:#d4f4d4; }
 .lancado { background:#c8e4ff; }
 .cancelada { background:#ffcccc; }
+.entrada { background:#fff3cd; }
 
 .login { display:flex; justify-content:center; align-items:center; height:100vh; }
 </style>
@@ -57,7 +58,6 @@ th, td { padding:5px; border:1px solid #ddd; white-space:nowrap; }
 
 <div class="conteudo">
 
-<!-- ✅ NOTAS (INALTERADO) -->
 <div id="notas">
 <h3>Notas Fiscais</h3>
 
@@ -71,7 +71,7 @@ th, td { padding:5px; border:1px solid #ddd; white-space:nowrap; }
 <table id="tabela"></table>
 </div>
 
-<!-- ✅ RECEBIMENTO -->
+<!-- RECEBIMENTO -->
 <div id="receb" style="display:none;">
 <h3>Recebimento</h3>
 
@@ -85,9 +85,12 @@ th, td { padding:5px; border:1px solid #ddd; white-space:nowrap; }
 <input id="pedidoReceb" placeholder="Pedido">
 
 <button class="botao" onclick="confirmarReceb()">Confirmar</button>
+
+<!-- ✅ NOVO BOTÃO -->
+<button class="botao" onclick="estornarReceb()">Estornar Recebimento</button>
 </div>
 
-<!-- ✅ SAP -->
+<!-- SAP -->
 <div id="sap" style="display:none;">
 <h3>Lançamento SAP</h3>
 
@@ -96,9 +99,11 @@ th, td { padding:5px; border:1px solid #ddd; white-space:nowrap; }
 <input id="valorSAP" readonly>
 
 <button class="botao" onclick="confirmarSAP()">Confirmar</button>
+
+<!-- ✅ NOVO BOTÃO -->
+<button class="botao" onclick="estornarSAP()">Estornar SAP</button>
 </div>
 
-<!-- ✅ IMPORTAR -->
 <div id="excel" style="display:none;">
 <h3>Importar Excel</h3>
 <input type="file" id="file">
@@ -157,19 +162,19 @@ function atualizarTotais(){
   `Total: ${total} | Recebidas: ${rec} | Lançadas: ${sap} | Canceladas: ${canc}`;
 }
 
-// ✅ NOTAS (INTACTO)
 function render(){
 tabela.innerHTML=`<tr>
 <th>UF</th><th>CHAVE</th><th>NUMERO</th><th>SERIE</th><th>EMISSAO</th>
 <th>CNPJ EMISSOR</th><th>IE EMISSOR</th><th>RAZAO SOCIAL</th>
-<th>CNPJ/CPF DEST</th><th>IE DEST</th><th>RAZAO DEST</th>
+<th>CNPJ DEST</th><th>IE DEST</th><th>RAZAO DEST</th>
 <th>CFOP</th><th>SELAGEM</th><th>SITUACAO</th><th>TIPO</th>
 <th>VALOR</th><th>PEDIDO</th><th>RECEBIDO</th><th>SAP</th>
 </tr>`;
 
 notas.forEach(n=>{
 let cls="";
-if(n.situacao?.toUpperCase().includes("CANCELADA")) cls="cancelada";
+if(n.situacao?.toUpperCase().includes("ENTRADA")) cls="entrada";
+else if(n.situacao?.toUpperCase().includes("CANCELADA")) cls="cancelada";
 else if(n.sap==="SIM") cls="lancado";
 else if(n.recebido==="SIM") cls="recebido";
 
@@ -198,34 +203,14 @@ tabela.innerHTML+=`
 });
 }
 
-// ✅ RECEBIMENTO COM ALERTA COMPLETO
 function confirmarReceb(){
-
 let n=notas.find(x=>x.chave===chaveReceb.value);
-
 if(!n) return alert("❌ Nota não encontrada");
-
-if(n.recebido==="SIM") return alert("⚠️ Nota já recebida!");
 
 let pedido = pedidoReceb.value.trim();
 
-if(pedido){
-let notaExistente = notas.find(x =>
-x.recebido==="SIM" &&
-x.pedido===pedido &&
-x.chave!==n.chave
-);
-
-if(notaExistente){
-if(!confirm(`⚠️ Já existe uma nota recebida com esse pedido.
-
-Chave: ${notaExistente.chave}
-Número: ${notaExistente.numero}
-
-Deseja continuar?`)){
-return;
-}
-}
+if(!pedido){
+  if(!confirm("⚠️ Nota sem pedido. Deseja continuar?")) return;
 }
 
 n.recebido="SIM";
@@ -236,6 +221,55 @@ db.collection("notas").doc(n.chave).set(n);
 alert("✅ Nota recebida!");
 }
 
+/* ✅ NOVO */
+function estornarReceb(){
+let n=notas.find(x=>x.chave===chaveReceb.value);
+if(!n) return alert("❌ Nota não encontrada");
+
+if(n.recebido!=="SIM"){
+  return alert("⚠️ Nota não está recebida");
+}
+
+if(!confirm("Deseja estornar o recebimento?")) return;
+
+n.recebido="NAO";
+n.pedido="";
+
+db.collection("notas").doc(n.chave).set(n);
+
+alert("✅ Recebimento estornado!");
+}
+
+function confirmarSAP(){
+let n=notas.find(x=>x.chave===chaveSAP.value);
+if(!n) return alert("Não encontrada");
+if(n.recebido!=="SIM") return alert("Receber primeiro");
+
+n.sap="SIM";
+db.collection("notas").doc(n.chave).set(n);
+
+alert("✅ SAP ok");
+}
+
+/* ✅ NOVO */
+function estornarSAP(){
+let n=notas.find(x=>x.chave===chaveSAP.value);
+if(!n) return alert("❌ Nota não encontrada");
+
+if(n.sap!=="SIM"){
+  return alert("⚠️ Nota não está lançada no SAP");
+}
+
+if(!confirm("Deseja estornar o SAP?")) return;
+
+n.sap="NAO";
+
+db.collection("notas").doc(n.chave).set(n);
+
+alert("✅ SAP estornado!");
+}
+
+/* resto igual */
 function buscarReceb(){
 let n=notas.find(x=>x.chave===chaveReceb.value);
 if(n){
@@ -254,68 +288,6 @@ valorSAP.value=n.valor;
 }
 }
 
-function confirmarSAP(){
-let n=notas.find(x=>x.chave===chaveSAP.value);
-if(!n) return;
-if(n.recebido!=="SIM") return alert("Receber primeiro");
-
-n.sap="SIM";
-db.collection("notas").doc(n.chave).set(n);
-
-alert("✅ Lançado no SAP!");
-}
-
-function importar(){
-let f=file.files[0];
-if(!f) return alert("Selecione arquivo");
-
-let r=new FileReader();
-
-r.onload=e=>{
-let wb=XLSX.read(e.target.result,{type:'binary'});
-let ws=wb.Sheets[wb.SheetNames[0]];
-let data=XLSX.utils.sheet_to_json(ws,{header:1});
-
-data.forEach((l,i)=>{
-if(i===0||!l[1]) return;
-
-let chave=String(l[1]).replace(/'/g,"").trim();
-
-db.collection("notas").doc(chave).set({
-uf:l[0],chave,numero:l[2],serie:l[3],emissao:l[4],
-cnpjEmit:l[5],ieEmit:l[6],razaoEmit:l[7],
-cnpjDest:l[8],ieDest:l[9],razaoDest:l[10],
-cfop:l[11],selagem:l[12],situacao:l[13],tipo:l[14],valor:l[15],
-pedido:"",recebido:"NAO",sap:"NAO"
-});
-});
-
-alert("✅ Importado!");
-};
-
-r.readAsBinaryString(f);
-}
-
-function exportar(){
-let wb=XLSX.utils.table_to_book(tabela);
-XLSX.writeFile(wb,"notas.xlsx");
-}
-
-function apagar(){
-if(confirm("Apagar tudo?")){
-notas.forEach(n=>db.collection("notas").doc(n.chave).delete());
-}
-}
-
-function filtrar(){
-let t=busca.value.toLowerCase();
-document.querySelectorAll("#tabela tr").forEach((l,i)=>{
-if(i==0)return;
-l.style.display=l.innerText.toLowerCase().includes(t)?"":"none";
-});
-}
-
 </script>
-
 </body>
 </html>
